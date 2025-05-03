@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Env & secrets
+.env
+.env.*
+*.env
+cookies.json
+dc_cookies.json
+error_log*.txt
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright
+playwright-report/

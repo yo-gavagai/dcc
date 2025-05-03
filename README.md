@@ -1,0 +1,117 @@
+# DCInside Post Cleaner
+
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Playwright](https://img.shields.io/badge/playwright-%E2%9C%94-green)](https://playwright.dev/)
+
+**디시인사이드 게시글 자동 삭제/정리 프로그램**
+
+---
+
+## 🚀 주요 특징
+- **모듈화/클래스 기반**: 인증, 쿠키, 게시글 관리 기능이 각각 분리되어 유지보수와 확장성이 뛰어남
+- **Playwright 기반**: POM(Page Object Model) 패턴, 내장 대기(wait) 전략, headless/headful 지원
+- **쿠키 재사용**: 최초 로그인 후 쿠키 저장, 이후 자동 로그인
+- **캡차 발생 시 수동 대응**
+- **모든 게시글 자동 반복 삭제**: 게시글이 없어질 때까지 반복
+- **환경변수 기반 보안**: 계정 정보는 .env 파일로 안전하게 관리
+
+---
+
+## 🛠️ 설치 및 환경 설정
+
+1. **Python 3.8+ 설치**
+2. **필수 패키지 설치**
+   ```bash
+   pip install -r requirements.txt
+   playwright install chromium
+   ```
+3. **환경 변수 파일 준비**
+   - `.env.example` → `.env`로 복사 후 계정 정보 입력
+     ```env
+     DC_USERNAME=your_username_here
+     DC_PASSWORD=your_password_here
+     ```
+
+---
+
+## ⚡ 사용법 (Quickstart)
+
+### 1) 소스 실행
+```bash
+python dc_cleaner.py
+```
+
+### 2) 패키지 설치 후 CLI 실행
+```bash
+pip install .
+dcinside-post-cleaner
+```
+
+### 3) 모듈로 실행
+```bash
+python -m dcinside_post_cleaner
+```
+
+- 브라우저 창이 열리며, 수동 캡차 해결 필요 시 안내됨
+- 모든 게시글이 삭제될 때까지 자동 반복
+- 삭제 진행 상황이 실시간으로 출력됨
+
+---
+
+## 🗂️ 프로젝트 구조 및 패키징
+
+```
+dcinside-post-cleaner/
+├── dc_cleaner.py           # 메인 실행 파일 (오케스트레이터)
+├── dc_auth.py              # 로그인/로그아웃 매니저
+├── dc_cookie.py            # 쿠키 관리 매니저
+├── dc_post.py              # 게시글 조회/삭제 매니저
+├── dc_logger.py            # 로깅/에러 관리
+├── dc_delete_strategy.py   # 삭제 버튼 탐색 전략 등
+├── requirements.txt        # 의존성 목록
+├── .env.example            # 환경변수 템플릿
+├── setup.py                # 패키지 메타정보
+├── .gitignore              # Git 무시 파일 목록
+├── LICENSE                 # 라이선스
+├── dcinside_post_cleaner/  # 패키지 디렉토리
+│   ├── __init__.py
+│   └── __main__.py         # python -m dcinside_post_cleaner 진입점
+└── README.md               # 이 문서
+```
+
+---
+
+## 💡 자주 묻는 질문 (FAQ)
+
+- **Q. 왜 headless 모드가 아닌가요?**
+  - 캡차, 차단 방지, 디버깅을 위해 기본 headful. 필요시 코드에서 headless=True로 변경 가능.
+- **Q. 게시글이 남아 있는데 삭제가 안 됩니다.**
+  - 삭제 실패 사유가 로그에 남습니다. 버튼 탐색/권한/캡차 등 확인 필요.
+- **Q. Playwright 설치 오류가 납니다.**
+  - `playwright install chromium` 명령을 꼭 실행하세요.
+
+---
+
+## 🛡️ Troubleshooting
+- **쿠키 파일이 없다고 나올 때**: 최초 로그인 시 쿠키가 생성됩니다. 로그인 정보가 맞는지 확인.
+- **TargetClosedError**: 브라우저/페이지가 강제 종료된 경우. 네트워크 불안정, 수동 종료 등 원인.
+- **IP 차단**: 반복 요청은 주의! 딜레이 조절, VPN 권장.
+
+---
+
+## 🤝 기여 및 라이선스
+- Pull Request, Issue 환영!
+- [MIT License](./LICENSE)
+
+---
+
+## 🌏 English Quickstart
+
+1. `pip install -r requirements.txt && playwright install chromium`
+2. Copy `.env.example` to `.env` and fill your DCInside credentials
+3. Run: `python dc_cleaner.py`
+4. The script will open a browser and delete all posts until none remain.
+
+---
+
+> 본 프로젝트는 연구/개인 정리용이며, 디시인사이드 정책을 반드시 준수하세요.
