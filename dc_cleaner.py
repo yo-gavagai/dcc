@@ -600,39 +600,37 @@ class DCCleaner:
     async def cleanup(self, hours_ago: float = 1.0):
         pass
 
-    async def run_delete_loop(self, posts):
+    async def run_delete_loop(self, posts, max_concurrent=3):
         from dc_logger import log_info
         total_attempt = len(posts)
         success_count = 0
         fail_count = 0
-        for post in posts:
-            # 브라우저/페이지가 닫힌 경우 루프 조기 종료
-            if not self.browser or not self.page:
-                print("\033[91m[FAIL] 브라우저나 페이지가 닫혀 더 이상 삭제를 진행할 수 없습니다.\033[0m")
-                log_info(f"[delete_post] 브라우저나 페이지가 닫혀 더 이상 삭제를 진행할 수 없습니다.", module="DCCleaner")
-                break
-            try:
-                result = await self.delete_post(post)
-                if result:
-                    success_count += 1
-                    print(f"\033[92m[SUCCESS] Deleted: {post['title']} | {post.get('link', '')}\033[0m")
-                    log_info(f"[delete_post] SUCCESS: {post['title']} | {post.get('link', '')}", module="DCCleaner")
-                else:
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def delete_with_semaphore(post):
+            nonlocal success_count, fail_count
+            async with semaphore:
+                try:
+                    result = await self.delete_post(post)
+                    if result:
+                        success_count += 1
+                        print(f"\033[92m[SUCCESS] Deleted: {post['title']} | {post.get('link', '')}\033[0m")
+                        log_info(f"[delete_post] SUCCESS: {post['title']} | {post.get('link', '')}", module="DCCleaner")
+                    else:
+                        fail_count += 1
+                        print(f"\033[91m[FAIL] Failed to delete: {post['title']} | {post.get('link', '')}\033[0m")
+                        log_info(f"[delete_post] FAIL: {post['title']} | {post.get('link', '')}", module="DCCleaner")
+                except Exception as e:
                     fail_count += 1
-                    print(f"\033[91m[FAIL] Failed to delete: {post['title']} | {post.get('link', '')}\033[0m")
-                    log_info(f"[delete_post] FAIL: {post['title']} | {post.get('link', '')}", module="DCCleaner")
-            except Exception as e:
-                fail_count += 1
-                err_msg = str(e)
-                print("\033[91m[FAIL] Unhandled exception in delete_post: {}\033[0m".format(e))
-                log_info(f"[delete_post] FAIL (Exception): {post['title']} | {post.get('link', '')} | {e}", module="DCCleaner")
-                with open('error_log.txt', 'a', encoding='utf-8') as f:
-                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {post['title']} | {getattr(self.page, 'url', 'unknown')} | {type(e).__name__}: {e}\n")
-                # TargetClosedError 또는 page가 닫혔다는 메시지가 포함되면 루프 중단
-                if "TargetClosedError" in err_msg or "context or browser has been closed" in err_msg or "browser has been closed" in err_msg:
-                    print("\033[91m[FAIL] 브라우저가 닫혀 삭제 루프를 중단합니다.\033[0m")
-                    log_info(f"[delete_post] 브라우저가 닫혀 삭제 루프를 중단합니다.", module="DCCleaner")
-                    break
+                    err_msg = str(e)
+                    print("\033[91m[FAIL] Unhandled exception in delete_post: {}\033[0m".format(e))
+                    log_info(f"[delete_post] FAIL (Exception): {post['title']} | {post.get('link', '')} | {e}", module="DCCleaner")
+                    with open('error_log.txt', 'a', encoding='utf-8') as f:
+                        f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {post['title']} | {getattr(self.page, 'url', 'unknown')} | {type(e).__name__}: {e}\n")
+                    if "TargetClosedError" in err_msg or "context or browser has been closed" in err_msg or "browser has been closed" in err_msg:
+                        print("\033[91m[FAIL] 브라우저가 닫혀 삭제 루프를 중단합니다.\033[0m")
+                        log_info(f"[delete_post] 브라우저가 닫혀 삭제 루프를 중단합니다.", module="DCCleaner")
+        await asyncio.gather(*(delete_with_semaphore(post) for post in posts))
         print(f"\033[94m[INFO] 모든 삭제 시도 완료. 총 시도: {total_attempt}, 성공: {success_count}, 실패: {fail_count}\033[0m")
         log_info(f"[delete_post] 모든 삭제 시도 완료. 총 시도: {total_attempt}, 성공: {success_count}, 실패: {fail_count}", module="DCCleaner")
 
@@ -675,23 +673,33 @@ if __name__ == "__main__":
             batch_num = 1
             while True:
                 try:
-                    # 더 많은 게시물을 한 번에 삭제 (최대한 오래된 글까지)
-                    posts = await cleaner.get_posts_from_gallog(hours_ago=10000.0)
+                    # 훨씬 더 많은 게시물을 한 번에 삭제 (10배 확대, 최대한 오래된 글까지)
+                    posts = await cleaner.get_posts_from_gallog(hours_ago=100000.0)
                     if not posts:
                         print("No more posts to delete.")
                         break
                     print(f"[Batch {batch_num}] Found {len(posts)} posts to delete.")
-                    for post in posts:
-                        try:
-                            success = await cleaner.delete_post(post)
-                            if success:
-                                print(f"[Batch {batch_num}] Successfully deleted: {post['title']}")
-                                total_deleted += 1
-                            else:
-                                print(f"[Batch {batch_num}] Failed to delete: {post['title']}")
-                        except Exception as post_err:
-                            print(f"[Batch {batch_num}] Error deleting post: {post['title']} | {post_err}")
-                    print(f"[Batch {batch_num}] Batch completed. Total deleted so far: {total_deleted}")
+                    # 병렬 삭제 최적화 (동시에 3개씩)
+                    semaphore = asyncio.Semaphore(3)
+                    batch_success = 0
+                    batch_fail = 0
+                    async def delete_with_semaphore(post):
+                        nonlocal total_deleted, batch_success, batch_fail
+                        async with semaphore:
+                            try:
+                                success = await cleaner.delete_post(post)
+                                if success:
+                                    print(f"[Batch {batch_num}] Successfully deleted: {post['title']}")
+                                    total_deleted += 1
+                                    batch_success += 1
+                                else:
+                                    print(f"[Batch {batch_num}] Failed to delete: {post['title']}")
+                                    batch_fail += 1
+                            except Exception as post_err:
+                                print(f"[Batch {batch_num}] Error deleting post: {post['title']} | {post_err}")
+                                batch_fail += 1
+                    await asyncio.gather(*(delete_with_semaphore(post) for post in posts))
+                    print(f"[Batch {batch_num}] Batch completed. 성공: {batch_success}, 실패: {batch_fail}, Total deleted so far: {total_deleted}")
                     batch_num += 1
                 except Exception as batch_err:
                     print(f"[Batch {batch_num}] Error in batch: {batch_err}")
