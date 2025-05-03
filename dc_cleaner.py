@@ -672,20 +672,30 @@ if __name__ == "__main__":
             await cleaner.init_browser()
             await cleaner.login()
             total_deleted = 0
+            batch_num = 1
             while True:
-                posts = await cleaner.get_posts_from_gallog(hours_ago=1.0)
-                if not posts:
-                    print("No more posts to delete.")
-                    break
-                print(f"Found {len(posts)} posts to delete in this batch.")
-                for post in posts:
-                    success = await cleaner.delete_post(post)
-                    if success:
-                        print(f"Successfully deleted: {post['title']}")
-                        total_deleted += 1
-                    else:
-                        print(f"Failed to delete: {post['title']}")
-                print(f"Batch completed. Total deleted so far: {total_deleted}")
+                try:
+                    posts = await cleaner.get_posts_from_gallog(hours_ago=1.0)
+                    if not posts:
+                        print("No more posts to delete.")
+                        break
+                    print(f"[Batch {batch_num}] Found {len(posts)} posts to delete.")
+                    for post in posts:
+                        try:
+                            success = await cleaner.delete_post(post)
+                            if success:
+                                print(f"[Batch {batch_num}] Successfully deleted: {post['title']}")
+                                total_deleted += 1
+                            else:
+                                print(f"[Batch {batch_num}] Failed to delete: {post['title']}")
+                        except Exception as post_err:
+                            print(f"[Batch {batch_num}] Error deleting post: {post['title']} | {post_err}")
+                    print(f"[Batch {batch_num}] Batch completed. Total deleted so far: {total_deleted}")
+                    batch_num += 1
+                except Exception as batch_err:
+                    print(f"[Batch {batch_num}] Error in batch: {batch_err}")
+                    # 예외 발생 시에도 루프를 중단하지 않고 다음 반복 진행
+                    batch_num += 1
         finally:
             await cleaner.close_resources()
     asyncio.run(safe_main())
