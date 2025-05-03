@@ -142,11 +142,11 @@ class DCCleaner:
                 print("Login successful!")
             else:
                 print("Login might have failed - could not find logged-in indicators")
-                await self.page.screenshot(path='login_result.png')
+                
                 
         except Exception as e:
             print(f"Error during login process: {e}")
-            await self.page.screenshot(path='login_error.png')
+            
             raise
         
         # Save cookies for future use
@@ -164,8 +164,8 @@ class DCCleaner:
         await self.page.wait_for_load_state('networkidle')
         await asyncio.sleep(2)
         
-        # Take a screenshot for debugging
-        await self.page.screenshot(path='gallog_page.png')
+        
+        
         
         # Get all posts from the gallog
         print("Finding posts...")
@@ -259,12 +259,12 @@ class DCCleaner:
                     print("[DEBUG] delete_post: 상세페이지 아님 분기")
                     log_info(f"[delete_post] Not a post detail page: {current_url} (expected: {post['link']}) -> Skipping delete button search.")
                     ts = int(time.time())
-                    await self.page.screenshot(path=f"not_detail_{ts}.png", full_page=True)
+                    
                     with open(f"not_detail_{ts}.html", "w", encoding="utf-8") as f:
                         f.write(await self.page.content())
                     return False
                 print("[DEBUG] delete_post: 정상 상세페이지 진입")
-                await self.page.screenshot(path=f"delete_page_{int(time.time())}.png", full_page=True)
+                
 
                 # 동영상 포함 게시물 감지 및 삭제 버튼 탐색 최적화
                 video_selectors = [
@@ -305,7 +305,7 @@ class DCCleaner:
                                 print(f"[DEBUG] 삭제 버튼 (사람처럼) 클릭 후 URL: {self.page.url}")
                                 content_snippet = await self.page.content()
                                 print(f"[DEBUG] 삭제 버튼 클릭 후 본문 일부: {content_snippet[:300]}")
-                                await self.page.screenshot(path=f"after_delete_btn_{int(time.time())}.png", full_page=True)
+                                
                                 log_info(f"[delete_post] 삭제 버튼 클릭 성공: {selector}")
                                 await asyncio.sleep(1)
                                 # 삭제 확인 페이지 처리
@@ -319,7 +319,7 @@ class DCCleaner:
                                         try:
                                             import random
                                             log_info("[delete_post] [delete 페이지] 삭제 확인 버튼 클릭 전 스크린샷 저장")
-                                            await self.page.screenshot(path=f"delete_confirm_btn_before_{int(time.time())}.png", full_page=True)
+                                            
                                             # 사람처럼 랜덤 대기
                                             rand_delay1 = random.uniform(1.2, 2.8)
                                             log_info(f"[delete_post] [anti-bot] 삭제 버튼 클릭 전 랜덤 대기: {rand_delay1:.2f}s")
@@ -339,7 +339,7 @@ class DCCleaner:
                                             log_info("[delete_post] 삭제 확인 버튼 클릭 성공 (최종 삭제)")
                                             await asyncio.sleep(0.5)
                                             log_info("[delete_post] [delete 페이지] 삭제 확인 버튼 클릭 후 스크린샷 저장")
-                                            await self.page.screenshot(path=f"delete_confirm_btn_after_{int(time.time())}.png", full_page=True)
+                                            
                                             # 버튼 사라졌는지 또는 페이지 이동 확인
                                             gone = False
                                             try:
@@ -420,7 +420,7 @@ class DCCleaner:
                                                 return False
                                         except Exception as click_exc:
                                             log_error(f"[delete_post] 삭제 확인 버튼 클릭 실패: {click_exc}")
-                                            await self.page.screenshot(path=f"delete_confirm_btn_click_fail_{int(time.time())}.png", full_page=True)
+                                            
                                             return False
                                         try:
                                             await self.page.wait_for_load_state('networkidle', timeout=10000)
@@ -460,7 +460,7 @@ class DCCleaner:
 
                                     else:
                                         log_error("[delete_post] 삭제 확인 버튼을 찾지 못함 (최종 삭제 단계)")
-                                        await self.page.screenshot(path=f"delete_confirm_not_found_{int(time.time())}.png", full_page=True)
+                                        
                                         return False
                                 # 삭제 후 실제 삭제 여부 검증
                                 await self.page.reload()
@@ -541,7 +541,7 @@ class DCCleaner:
                                     msg = f"[delete_post] [FAIL] Post still exists or accessible after deletion attempt: {post['title']} at {self.page.url} (총소요: {elapsed:.2f}s, 확인~검증: {confirm_verify_time:.2f}s)"
                                     log_error(msg)
                                     print(f"\033[91m{msg}\033[0m")
-                                    await self.page.screenshot(path=f"delete_failed_{int(time.time())}.png", full_page=True)
+                                    
                                     log_task_end('delete_post', module='DCCleaner')
                                     return False
                             except Exception as click_e:
@@ -572,7 +572,7 @@ class DCCleaner:
                     continue
             except Exception as e:
                 log_error(f"[delete_post] 예외 발생 (attempt {attempt}): {e}", exc_info=sys.exc_info())
-                await self.page.screenshot(path=f"delete_failed_{int(time.time())}.png", full_page=True)
+                
                 if attempt == max_retry:
                     return False
                 # 페이지 복구 후 재시도
