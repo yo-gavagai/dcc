@@ -675,7 +675,8 @@ if __name__ == "__main__":
             batch_num = 1
             while True:
                 try:
-                    posts = await cleaner.get_posts_from_gallog(hours_ago=1.0)
+                    # 더 많은 게시물을 한 번에 삭제 (최대한 오래된 글까지)
+                    posts = await cleaner.get_posts_from_gallog(hours_ago=10000.0)
                     if not posts:
                         print("No more posts to delete.")
                         break
@@ -696,6 +697,7 @@ if __name__ == "__main__":
                     print(f"[Batch {batch_num}] Error in batch: {batch_err}")
                     # 예외 발생 시에도 루프를 중단하지 않고 다음 반복 진행
                     batch_num += 1
+            print(f"\n[RESULT] 실행 종료 - 이번 실행에서 총 {total_deleted}개의 게시물을 삭제했습니다.")
         finally:
             await cleaner.close_resources()
     try:
