@@ -698,4 +698,14 @@ if __name__ == "__main__":
                     batch_num += 1
         finally:
             await cleaner.close_resources()
-    asyncio.run(safe_main())
+    try:
+        asyncio.run(safe_main())
+    except RuntimeError as e:
+        if str(e) != 'Event loop is closed':
+            raise
+        # Windows에서 발생하는 종료 시 RuntimeError 무시
+    except Exception as e:
+        print(f"[ERROR] 프로그램 종료 중 예외 발생: {e}")
+    finally:
+        import sys
+        sys.exit(0)
