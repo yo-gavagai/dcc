@@ -230,8 +230,8 @@ class DCCleaner:
             
         return posts
 
-    async def delete_post(self, post: dict) -> bool:
-        print("[DEBUG] delete_post 진입 (최상단)")
+    async def delete_post_with_page(self, post: dict, page) -> bool:
+        print("[DEBUG] delete_post_with_page 진입 (최상단)")
         log_task_start('delete_post', module='DCCleaner')
         from dc_logger import log_info, log_error
         import traceback
@@ -242,26 +242,23 @@ class DCCleaner:
             try:
                 _start_time = _time.time()
                 # 페이지/브라우저가 닫혀있으면 복구 시도
-                if self.page.is_closed():
-                    log_info(f"[delete_post] Page closed, reopening (attempt {attempt})")
-                    self.page = await self.context.new_page()
-                await self.page.goto(post['link'], timeout=45000)
-                await self.page.wait_for_load_state('networkidle', timeout=45000)
+                await page.goto(post['link'], timeout=45000)
+                await page.wait_for_load_state('networkidle', timeout=45000)
                 await asyncio.sleep(2)
-                # 게시글 상세 페이지가 아니면 스크린샷/삭제 버튼 탐색 모두 생략
+                # 게시글 상세 페이지가 아니면 삭제 버튼 탐색 모두 생략
                 if "/board/view" not in post['link']:
                     print("[DEBUG] delete_post: 링크 패턴 불일치 분기")
                     log_info(f"[delete_post] Invalid post link pattern: {post['link']} -> Skipping.")
                     return False
 
-                current_url = self.page.url
+                current_url = page.url
                 if "/board/view/" not in current_url and "/board/" not in current_url:
                     print("[DEBUG] delete_post: 상세페이지 아님 분기")
                     log_info(f"[delete_post] Not a post detail page: {current_url} (expected: {post['link']}) -> Skipping delete button search.")
                     ts = int(time.time())
                     
                     with open(f"not_detail_{ts}.html", "w", encoding="utf-8") as f:
-                        f.write(await self.page.content())
+                        f.write(await page.content())
                     return False
                 print("[DEBUG] delete_post: 정상 상세페이지 진입")
                 
@@ -277,7 +274,7 @@ class DCCleaner:
                 ]
                 has_video = False
                 for selector in video_selectors:
-                    if await self.page.query_selector(selector):
+                    if await page.query_selector(selector):
                         has_video = True
                         break
                 delete_button = None
@@ -290,7 +287,7 @@ class DCCleaner:
                 print("[DEBUG] delete_post: 삭제 버튼 탐색 루프 진입")
                 for selector in delete_selectors:
                     try:
-                        delete_button = await self.page.query_selector(selector)
+                        delete_button = await page.query_selector(selector)
                         if delete_button:
                             print(f"[DEBUG] delete_post: 삭제 버튼 발견 및 클릭 시도: {selector}")
                             try:
@@ -300,21 +297,21 @@ class DCCleaner:
                                 await asyncio.sleep(0.5)
                                 await delete_button.focus()
                                 await asyncio.sleep(0.2)
-                                await self.page.evaluate('(el) => el.click()', delete_button)
+                                await page.evaluate('(el) => el.click()', delete_button)
                                 await asyncio.sleep(0.5)
-                                print(f"[DEBUG] 삭제 버튼 (사람처럼) 클릭 후 URL: {self.page.url}")
-                                content_snippet = await self.page.content()
+                                print(f"[DEBUG] 삭제 버튼 (사람처럼) 클릭 후 URL: {page.url}")
+                                content_snippet = await page.content()
                                 print(f"[DEBUG] 삭제 버튼 클릭 후 본문 일부: {content_snippet[:300]}")
                                 
                                 log_info(f"[delete_post] 삭제 버튼 클릭 성공: {selector}")
                                 await asyncio.sleep(1)
                                 # 삭제 확인 페이지 처리
-                                if '/board/delete/' in self.page.url:
+                                if '/board/delete/' in page.url:
                                     print("[DEBUG] delete_post: 정상 삭제 확인 페이지 진입 (최신 네트워크/본문 판정 분기)")
                                     # robust selector for 최종 삭제 버튼
-                                    confirm_btn = await self.page.query_selector("button.btn_blue.btn_svc[type=submit]:has-text('삭제')")
+                                    confirm_btn = await page.query_selector("button.btn_blue.btn_svc[type=submit]:has-text('삭제')")
                                     if not confirm_btn:
-                                        confirm_btn = await self.page.query_selector("input[type=submit][value=삭제], button:has-text('삭제')")
+                                        confirm_btn = await page.query_selector("input[type=submit][value=삭제], button:has-text('삭제')")
                                     if confirm_btn:
                                         try:
                                             import random
@@ -328,7 +325,7 @@ class DCCleaner:
                                             box = await confirm_btn.bounding_box()
                                             if box:
                                                 steps = random.randint(8, 20)
-                                                await self.page.mouse.move(box['x'] + box['width']/2, box['y'] + box['height']/2, steps=steps)
+                                                await page.mouse.move(box['x'] + box['width']/2, box['y'] + box['height']/2, steps=steps)
                                                 rand_delay2 = random.uniform(0.1, 0.4)
                                                 log_info(f"[delete_post] [anti-bot] 삭제 버튼 마우스 이동 후 대기: {rand_delay2:.2f}s (steps={steps})")
                                                 await asyncio.sleep(rand_delay2)
@@ -353,7 +350,7 @@ class DCCleaner:
                                             # --- 네트워크 응답 감지 ---
                                             delete_response = None
                                             try:
-                                                async with self.page.expect_response(
+                                                async with page.expect_response(
                                                     lambda resp: ('delete' in resp.url or 'remove' in resp.url) and resp.status in [200, 302, 303, 204, 403], timeout=5000
                                                 ) as resp_info:
                                                     await confirm_btn.click()
@@ -386,7 +383,7 @@ class DCCleaner:
                                                 print(f"[delete_post] [network] 삭제 관련 응답 감지 실패: {e}")
                                             await asyncio.sleep(4)
                                             # --- 삭제 후 페이지에서 성공/실패 텍스트 직접 확인 ---
-                                            page_content = await self.page.content()
+                                            page_content = await page.content()
                                             success_phrases = [
                                                 '삭제되었습니다',
                                                 '존재하지 않는 게시물입니다',
@@ -610,8 +607,9 @@ class DCCleaner:
         async def delete_with_semaphore(post):
             nonlocal success_count, fail_count
             async with semaphore:
+                page = await self.context.new_page()
                 try:
-                    result = await self.delete_post(post)
+                    result = await self.delete_post_with_page(post, page)
                     if result:
                         success_count += 1
                         print(f"\033[92m[SUCCESS] Deleted: {post['title']} | {post.get('link', '')}\033[0m")
@@ -626,10 +624,12 @@ class DCCleaner:
                     print("\033[91m[FAIL] Unhandled exception in delete_post: {}\033[0m".format(e))
                     log_info(f"[delete_post] FAIL (Exception): {post['title']} | {post.get('link', '')} | {e}", module="DCCleaner")
                     with open('error_log.txt', 'a', encoding='utf-8') as f:
-                        f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {post['title']} | {getattr(self.page, 'url', 'unknown')} | {type(e).__name__}: {e}\n")
+                        f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {post['title']} | {getattr(page, 'url', 'unknown')} | {type(e).__name__}: {e}\n")
                     if "TargetClosedError" in err_msg or "context or browser has been closed" in err_msg or "browser has been closed" in err_msg:
                         print("\033[91m[FAIL] 브라우저가 닫혀 삭제 루프를 중단합니다.\033[0m")
                         log_info(f"[delete_post] 브라우저가 닫혀 삭제 루프를 중단합니다.", module="DCCleaner")
+                finally:
+                    await page.close()
         await asyncio.gather(*(delete_with_semaphore(post) for post in posts))
         print(f"\033[94m[INFO] 모든 삭제 시도 완료. 총 시도: {total_attempt}, 성공: {success_count}, 실패: {fail_count}\033[0m")
         log_info(f"[delete_post] 모든 삭제 시도 완료. 총 시도: {total_attempt}, 성공: {success_count}, 실패: {fail_count}", module="DCCleaner")
@@ -686,8 +686,9 @@ if __name__ == "__main__":
                     async def delete_with_semaphore(post):
                         nonlocal total_deleted, batch_success, batch_fail
                         async with semaphore:
+                            page = await cleaner.context.new_page()
                             try:
-                                success = await cleaner.delete_post(post)
+                                success = await cleaner.delete_post_with_page(post, page)
                                 if success:
                                     print(f"[Batch {batch_num}] Successfully deleted: {post['title']}")
                                     total_deleted += 1
@@ -698,6 +699,8 @@ if __name__ == "__main__":
                             except Exception as post_err:
                                 print(f"[Batch {batch_num}] Error deleting post: {post['title']} | {post_err}")
                                 batch_fail += 1
+                            finally:
+                                await page.close()
                     await asyncio.gather(*(delete_with_semaphore(post) for post in posts))
                     print(f"[Batch {batch_num}] Batch completed. 성공: {batch_success}, 실패: {batch_fail}, Total deleted so far: {total_deleted}")
                     batch_num += 1
